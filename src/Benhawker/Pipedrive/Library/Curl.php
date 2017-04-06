@@ -42,7 +42,7 @@ class Curl
         $this->curl = curl_init();
         //Set up options for cURL session
         $this->setOpt(CURLOPT_USERAGENT, self::USER_AGENT)
-             ->setOpt(CURLOPT_HEADER, false)
+             ->setOpt(CURLOPT_HEADER, true)
              ->setOpt(CURLOPT_RETURNTRANSFER, true)
              ->setOpt(CURLOPT_HTTPHEADER, array("Accept: application/json"));
     }
@@ -122,16 +122,57 @@ class Curl
                     ->exec();
     }
 
+    static protected function http_parse_headers($raw_headers)
+    {
+        $headers = array();
+        $key = '';
+
+        foreach(explode("\n", $raw_headers) as $i => $h)
+        {
+            $h = explode(':', $h, 2);
+
+            if (isset($h[1]))
+            {
+                if (!isset($headers[$h[0]]))
+                    $headers[$h[0]] = trim($h[1]);
+                elseif (is_array($headers[$h[0]]))
+                {
+                    $headers[$h[0]] = array_merge($headers[$h[0]], array(trim($h[1])));
+                }
+                else
+                {
+                    $headers[$h[0]] = array_merge(array($headers[$h[0]]), array(trim($h[1])));
+                }
+                $key = $h[0];
+            }
+            else
+            {
+                if (substr($h[0], 0, 1) == "\t")
+                    $headers[$key] .= "\r\n\t".trim($h[0]);
+                elseif (!$key)
+                    $headers[0] = trim($h[0]);trim($h[0]);
+            }
+        }
+
+        return $headers;
+    }
+
     /**
      * Execute current cURL session
      *
      * @return array decoded json ouput
      */
-    protected function exec()
+    protected function exec($retries = 3)
     {
         //get response output and info
-        $response = curl_exec($this->curl);
-        $info     = curl_getinfo($this->curl);
+        $response       = curl_exec($this->curl);
+        $info           = curl_getinfo($this->curl);
+        $header_size    = $info['header_size'];
+        $header         = substr($response, 0, $header_size);
+        $body           = substr($response, $header_size);
+        $response       = $body;
+        $headers        = self::http_parse_headers($header);
+        $backoff_seconds= 5;                                    // default value
 
         //if there is a curl error throw Exception
         if (curl_error($this->curl)) {
@@ -141,8 +182,16 @@ class Curl
         //decode output
         $result = json_decode($response, true);
 
+        // if API quota is reached, wait and retry (at most 3 times)
+        if ($info['http_code'] == 429 && $retries > 0) {
+            if (!empty($headers) && !empty($headers['x-ratelimit-reset'])) {
+                $backoff_seconds = intval($headers['x-ratelimit-reset'])+1; // one extra second, just to be sure
+            }
+            sleep($backoff_seconds);
+            return $this->exec(--$retries);
+        }
         //if http error throw exception
-        if (floor($info['http_code'] / 100) >= 4) {
+        else if (floor($info['http_code'] / 100) >= 4) {
             //throw error
             throw new PipedriveApiError('API HTTP Error ' . $info['http_code'] . '. Message ' . $result['error']);
         }

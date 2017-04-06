@@ -32,6 +32,17 @@ class Deals
     }
 
     /**
+     * Returns all deals
+     *
+     * @param  array  search parameters
+     * @return array returns details of a deal
+     */
+    public function getAll($param = array())
+    {
+        return $this->curl->get('deals/', $param);
+    }
+
+    /**
      * Returns a deal
      *
      * @param  int   $id pipedrive deals id
@@ -74,6 +85,22 @@ class Deals
         }
 
         return $this->curl->get('deals/' . $data['id'] . '/products');
+    }
+
+    /**
+     * Lists participants to a deal.
+     *
+     * @param  array $data (id, start, limit)
+     * @return array persons
+     */
+    public function participants(array $data)
+    {
+        //if there is no id set throw error as it is a required field
+        if (!isset($data['id'])) {
+            throw new PipedriveMissingFieldError('You must include the "id" of the deal when getting participants');
+        }
+
+        return $this->curl->get('deals/' . $data['id'] . '/participants');
     }
 
     /**
@@ -143,3 +170,4 @@ class Deals
     }
 
 }
+

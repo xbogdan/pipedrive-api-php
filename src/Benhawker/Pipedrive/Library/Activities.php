@@ -29,6 +29,16 @@ class Activities
         $this->curl = $master->curl();
     }
 
+    public function getById($id)
+    {
+        return $this->curl->get('activities/' . $id);
+    }
+
+    public function update($activityId, array $data = array())
+    {
+        return $this->curl->put('activities/' . $activityId, $data);
+    }
+
     /**
      * Adds a activity
      *
@@ -46,3 +56,4 @@ class Activities
         return $this->curl->post('activities', $data);
     }
 }
+

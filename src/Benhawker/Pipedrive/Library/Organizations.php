@@ -79,6 +79,21 @@ class Organizations
     }
 
     /**
+     * Lists persons associated with a organization.
+     *
+     * @param  array $data (id, start, limit)
+     * @return array deals
+     */
+    public function persons(array $data)
+    {
+        //if there is no name set throw error as it is a required field
+        if (!isset($data['id'])) {
+            throw new PipedriveMissingFieldError('You must include the "id" of the organization when getting persons');
+        }
+        return $this->curl->get('organizations/' . $data['id'] . '/persons');
+    }
+
+    /**
      * Updates an organization
      *
      * @param  int   $organizationId pipedrives organization Id
@@ -117,3 +132,4 @@ class Organizations
         return $this->curl->delete('organizations/' . $organizationId);
     }
 }
+
